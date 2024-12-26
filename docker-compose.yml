@@ -1,0 +1,39 @@
+services:
+  app: 
+    build: 
+      context: . 
+      dockerfile: Dockerfile 
+    ports: 
+      - "8000:8000" 
+    env_file: 
+      - .env 
+    depends_on: 
+      - db 
+    volumes: 
+      - .:/app 
+    networks: 
+      - mynetwork 
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # This is crucial for Linux systems
+    environment: 
+      OLLAMA_URL: "host.docker.internal:11434"  # Use host.docker.internal
+  
+  db: 
+    image: ankane/pgvector 
+    container_name: pgvector_db 
+    ports: 
+      - "5436:5432" 
+    environment: 
+      POSTGRES_USER: postgres 
+      POSTGRES_PASSWORD: Qna123 
+      POSTGRES_DB: qna_db 
+    volumes: 
+      - pg_data:/var/lib/postgresql/data 
+    networks: 
+      - mynetwork 
+ 
+volumes: 
+  pg_data: 
+ 
+networks: 
+  mynetwork:

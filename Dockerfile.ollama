@@ -1,0 +1,10 @@
+FROM ollama/ollama
+
+WORKDIR /app
+
+# Install and start Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+# Start Ollama server
+CMD ["sh", "-c", "ollama pull llama3 && ollama run llama3 --host 0.0.0.0 --port 11434"]
+

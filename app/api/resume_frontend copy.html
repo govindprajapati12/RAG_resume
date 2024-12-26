@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Analysis Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f4f6f9; padding: 20px; }
+        .card {
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background-color: #aa2646;
+            color: white;
+            padding: 12px 20px;
+        }
+        .response-box {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .status {
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+        }
+        .status-info { background-color: #e3f2fd; }
+        .status-success { background-color: #e8f5e9; }
+        .status-error { background-color: #ffebee; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">Resume Upload</div>
+                    <div class="card-body">
+                        <form id="uploadForm">
+                            <div class="mb-3">
+                                <label class="form-label">User ID</label>
+                                <input type="text" class="form-control" id="uploadUserId" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Resume File</label>
+                                <input type="file" class="form-control" id="resumeFile" accept=".pdf,.doc,.docx" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="uploadBtn">Upload Resume</button>
+                        </form>
+                        <!-- <div id="uploadStatus" class="status"></div> -->
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">Analysis Tools</div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">User ID</label>
+                            <input type="text" class="form-control" id="analysisUserId">
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary" onclick="analyze('experience')">Experience</button>
+                            <button class="btn btn-outline-primary" onclick="analyze('skills')">Skills</button>
+                            <button class="btn btn-outline-primary" onclick="analyze('education')">Education</button>
+                            <button class="btn btn-outline-primary" onclick="analyze('working_company')">Company</button>
+                            <button class="btn btn-outline-primary" onclick="analyze('achievements')">Achievements</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">Results</div>
+                    <div class="card-body">
+                        <div id="results" class="response-box">
+                            <p class="text-muted text-center">Results will appear here</p>
+                            <div id="uploadStatus" class="status"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('uploadStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = `status status-${type}`;
+        }
+
+        function updateResults(content) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.textContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+        }
+
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const userId = document.getElementById('uploadUserId').value;
+            const fileInput = document.getElementById('resumeFile');
+            const uploadBtn = document.getElementById('uploadBtn');
+
+            if (!userId || !fileInput.files[0]) {
+                updateStatus('Please provide both User ID and Resume file', 'error');
+                return;
+            }
+
+            uploadBtn.disabled = true;
+            updateStatus('Starting upload...', 'info');
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch(`${API_URL}/resume?userid=${userId}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+
+                if (response.ok) {
+                    const data = await response.text();
+                    console.log('Response data:', data);
+                    
+                    try {
+                        const jsonData = JSON.parse(data);
+                        updateResults(jsonData);
+                        updateStatus('Upload successful!', 'success');
+                        
+                        // Reset form on success
+                        fileInput.value = '';
+                        document.getElementById('uploadUserId').value = '';
+                    } catch (parseError) {
+                        console.log('Raw response:', data);
+                        updateResults(data);
+                        updateStatus('Upload completed, but response format was unexpected', 'info');
+                    }
+                } else {
+                    throw new Error(`Upload failed with status: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                updateStatus(`Upload failed: ${error.message}`, 'error');
+                updateResults('Upload failed. Please try again.');
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        });
+
+        async function analyze(type) {
+            const userId = document.getElementById('analysisUserId').value;
+            if (!userId) {
+                updateStatus('Please enter a User ID', 'error');
+                return;
+            }
+
+            updateStatus(`Analyzing ${type}...`, 'info');
+            
+            try {
+                const response = await fetch(`${API_URL}/${type}?userid=${userId}`);
+                console.log(`Analysis ${type} response:`, response);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    updateResults(data);
+                    updateStatus('Analysis complete!', 'success');
+                } else {
+                    throw new Error(`Analysis failed with status: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Analysis error:', error);
+                updateStatus(`Analysis failed: ${error.message}`, 'error');
+                updateResults(`Analysis failed. Please try again.`);
+            }
+        }
+    </script>
+</body>
+</html>
